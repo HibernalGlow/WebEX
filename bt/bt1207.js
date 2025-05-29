@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         BT1207磁力链批量获取
 // @namespace    http://tampermonkey.net/
-// @version      0.7.3
-// @description  为BT1207搜索结果添加磁力链接快速显示和批量获取功能
+// @version      0.8.0
+// @description  为BT1207搜索结果添加磁力链接快速显示和批量获取功能，支持半自动复制
 // @author       Your name
 // @match        *://*/*bt1207*/*
 // @match        *://*bt1207*.*/*
@@ -48,12 +48,23 @@
         delayBetweenBatches: GM_getValue('delayBetweenBatches', 1500),
         batchSize: GM_getValue('batchSize', 2),
         maxRetries: GM_getValue('maxRetries', 3),
+        // 半自动复制相关配置
+        semiAutoCopyDelay: GM_getValue('semiAutoCopyDelay', 2000),
+        showCopyLogs: GM_getValue('showCopyLogs', true),
+        copyRetryEnabled: GM_getValue('copyRetryEnabled', true),
+        copyRetryDelay: GM_getValue('copyRetryDelay', 1000),
+        maxCopyRetries: GM_getValue('maxCopyRetries', 2),
 
         save() {
             GM_setValue('notificationEnabled', this.notificationEnabled);
             GM_setValue('delayBetweenBatches', this.delayBetweenBatches);
             GM_setValue('batchSize', this.batchSize);
             GM_setValue('maxRetries', this.maxRetries);
+            GM_setValue('semiAutoCopyDelay', this.semiAutoCopyDelay);
+            GM_setValue('showCopyLogs', this.showCopyLogs);
+            GM_setValue('copyRetryEnabled', this.copyRetryEnabled);
+            GM_setValue('copyRetryDelay', this.copyRetryDelay);
+            GM_setValue('maxCopyRetries', this.maxCopyRetries);
         }
     };
 
@@ -184,7 +195,7 @@
             background-color: rgba(76, 175, 80, 0.1);
             border-radius: 4px;
         }
-        #getMagnetsBtn, #selectAllBtn, #invertSelectBtn, #selectKeywordsBtn {
+        #getMagnetsBtn, #selectAllBtn, #invertSelectBtn, #selectKeywordsBtn, #semiAutoCopyBtn, #settingsBtn {
             position: fixed;
             padding: 10px 20px;
             background: #4CAF50;
@@ -201,21 +212,34 @@
             bottom: 20px;
             right: 20px;
         }
-        #selectAllBtn {
+        #semiAutoCopyBtn {
             bottom: 20px;
             right: 200px;
         }
+        #selectAllBtn {
+            bottom: 20px;
+            right: 340px;
+        }
         #invertSelectBtn {
             bottom: 20px;
-            right: 320px;
+            right: 420px;
         }
         #selectKeywordsBtn {
             bottom: 20px;
-            right: 440px;
+            right: 500px;
             font-size: 16px;
         }
-        #getMagnetsBtn:hover, #selectAllBtn:hover, #invertSelectBtn:hover, #selectKeywordsBtn:hover {
+        #settingsBtn {
+            bottom: 20px;
+            right: 580px;
+            font-size: 16px;
+            background: #2196F3;
+        }
+        #getMagnetsBtn:hover, #selectAllBtn:hover, #invertSelectBtn:hover, #selectKeywordsBtn:hover, #semiAutoCopyBtn:hover {
             background: #45a049;
+        }
+        #settingsBtn:hover {
+            background: #0b7dda;
         }
         .magnet-icon {
             display: inline-block;
@@ -249,6 +273,7 @@
             border-radius: 2px;
             overflow: hidden;
             display: none;
+            z-index: 9999;
         }
         .progress-bar .progress {
             width: 0;
@@ -295,6 +320,144 @@
             background: #F57C00;
             transform: scale(1.05);
         }
+        /* 半自动复制相关样式 */
+        #copyLogPanel {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            width: 350px;
+            height: 250px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            z-index: 9998;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        #copyLogHeader {
+            padding: 10px;
+            background: #4CAF50;
+            color: white;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #copyLogContent {
+            flex: 1;
+            padding: 10px;
+            overflow-y: auto;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        #copyLogFooter {
+            padding: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid #eee;
+            background: #f5f5f5;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            padding-bottom: 5px;
+            border-bottom: 1px dotted #eee;
+        }
+        .log-success {
+            color: #4CAF50;
+        }
+        .log-error {
+            color: #F44336;
+        }
+        .log-info {
+            color: #2196F3;
+        }
+        .close-btn {
+            cursor: pointer;
+            width: 20px;
+            height: 20px;
+            text-align: center;
+            line-height: 20px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.3);
+        }
+        .close-btn:hover {
+            background: rgba(255,255,255,0.5);
+        }
+        #settingsPanel {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 400px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.3);
+            z-index: 10000;
+            display: none;
+            padding: 20px;
+        }
+        #settingsPanel h3 {
+            margin-top: 0;
+            color: #4CAF50;
+        }
+        .settings-row {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+        .settings-row label {
+            flex: 1;
+            font-size: 14px;
+        }
+        .settings-row input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 80px;
+        }
+        .settings-row input[type="checkbox"] {
+            width: auto;
+        }
+        .btn-group {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+        .btn-group button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            margin-left: 10px;
+            cursor: pointer;
+        }
+        .btn-primary {
+            background: #4CAF50;
+            color: white;
+        }
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #333;
+        }
+        .magnet-container.copied {
+            background-color: rgba(33, 150, 243, 0.1);
+        }
+        .copy-progress {
+            margin-left: 10px;
+            font-size: 14px;
+            color: #4CAF50;
+        }
+        .copy-control-btn {
+            padding: 5px 10px;
+            border: none;
+            border-radius: 4px;
+            margin-left: 5px;
+            cursor: pointer;
+            background: #FF9800;
+            color: white;
+            font-size: 12px;
+        }
     `;
     document.head.appendChild(style);
 
@@ -308,6 +471,11 @@
                 location.reload();
             }
         );
+        
+        // 添加半自动复制设置菜单
+        GM_registerMenuCommand('半自动复制设置', () => {
+            document.getElementById('settingsPanel').style.display = 'block';
+        });
     }
     updateMenuCommand();
 
@@ -381,6 +549,8 @@
         } else {
             container.classList.remove('selected');
             if (icon) icon.classList.remove('selected');
+            // 当取消选中时也移除复制标记
+            container.classList.remove('copied');
         }
     }
 
@@ -544,6 +714,12 @@
     getMagnetsBtn.textContent = '获取选中磁力链接';
     document.body.appendChild(getMagnetsBtn);
 
+    const semiAutoCopyBtn = document.createElement('button');
+    semiAutoCopyBtn.id = 'semiAutoCopyBtn';
+    semiAutoCopyBtn.textContent = '半自动复制';
+    semiAutoCopyBtn.title = '逐个复制选中的磁力链接';
+    document.body.appendChild(semiAutoCopyBtn);
+
     const selectAllBtn = document.createElement('button');
     selectAllBtn.id = 'selectAllBtn';
     selectAllBtn.textContent = '全选';
@@ -554,12 +730,316 @@
     invertSelectBtn.textContent = '反选';
     document.body.appendChild(invertSelectBtn);
 
+    // 添加设置按钮
+    const settingsBtn = document.createElement('button');
+    settingsBtn.id = 'settingsBtn';
+    settingsBtn.textContent = '⚙️';
+    settingsBtn.title = '设置';
+    document.body.appendChild(settingsBtn);
+
+    // 创建复制日志面板
+    const copyLogPanel = document.createElement('div');
+    copyLogPanel.id = 'copyLogPanel';
+    copyLogPanel.innerHTML = `
+        <div id="copyLogHeader">
+            <span>磁力链接复制日志</span>
+            <span class="close-btn" id="closeCopyLog">✕</span>
+        </div>
+        <div id="copyLogContent"></div>
+        <div id="copyLogFooter">
+            <div>
+                <span id="copyProgress">0/0</span>
+                <span class="copy-progress"></span>
+            </div>
+            <div>
+                <button id="pauseCopyBtn" class="copy-control-btn">暂停</button>
+                <button id="stopCopyBtn" class="copy-control-btn">停止</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(copyLogPanel);
+
+    // 创建设置面板
+    const settingsPanel = document.createElement('div');
+    settingsPanel.id = 'settingsPanel';
+    settingsPanel.innerHTML = `
+        <h3>半自动复制设置</h3>
+        <div class="settings-row">
+            <label for="semiAutoCopyDelay">复制间隔(毫秒)：</label>
+            <input type="number" id="semiAutoCopyDelay" min="100" max="10000" value="${Config.semiAutoCopyDelay}">
+        </div>
+        <div class="settings-row">
+            <label for="showCopyLogs">显示复制日志：</label>
+            <input type="checkbox" id="showCopyLogs" ${Config.showCopyLogs ? 'checked' : ''}>
+        </div>
+        <div class="settings-row">
+            <label for="copyRetryEnabled">启用复制重试：</label>
+            <input type="checkbox" id="copyRetryEnabled" ${Config.copyRetryEnabled ? 'checked' : ''}>
+        </div>
+        <div class="settings-row">
+            <label for="copyRetryDelay">重试间隔(毫秒)：</label>
+            <input type="number" id="copyRetryDelay" min="100" max="5000" value="${Config.copyRetryDelay}">
+        </div>
+        <div class="settings-row">
+            <label for="maxCopyRetries">最大重试次数：</label>
+            <input type="number" id="maxCopyRetries" min="1" max="5" value="${Config.maxCopyRetries}">
+        </div>
+        <div class="btn-group">
+            <button id="cancelSettingsBtn" class="btn-secondary">取消</button>
+            <button id="saveSettingsBtn" class="btn-primary">保存</button>
+        </div>
+    `;
+    document.body.appendChild(settingsPanel);
+
+    // 创建进度条
+    const progressBar = document.createElement('div');
+    progressBar.className = 'progress-bar';
+    progressBar.innerHTML = '<div class="progress"></div>';
+    document.body.appendChild(progressBar);
+
+    // 添加复制日志辅助函数
+    const CopyLogger = {
+        logs: [],
+        maxLogs: 100,
+        logElement: null,
+        progressElement: null,
+        
+        init() {
+            this.logElement = document.getElementById('copyLogContent');
+            this.progressElement = document.getElementById('copyProgress');
+            this.clear();
+        },
+        
+        addLog(message, type = 'info') {
+            const time = new Date().toLocaleTimeString();
+            const log = {
+                message,
+                type,
+                time
+            };
+            
+            this.logs.unshift(log);
+            
+            if (this.logs.length > this.maxLogs) {
+                this.logs.pop();
+            }
+            
+            this.updateDisplay();
+        },
+        
+        updateProgress(current, total) {
+            if (this.progressElement) {
+                this.progressElement.textContent = `${current}/${total}`;
+            }
+            
+            // 更新进度条
+            const progressBarEl = document.querySelector('.progress-bar');
+            const progressEl = document.querySelector('.progress-bar .progress');
+            
+            if (progressBarEl && progressEl) {
+                const percent = Math.round((current / total) * 100);
+                progressEl.style.width = `${percent}%`;
+                progressBarEl.style.display = 'block';
+                
+                if (current >= total) {
+                    setTimeout(() => {
+                        progressBarEl.style.display = 'none';
+                    }, 1000);
+                }
+            }
+        },
+        
+        updateDisplay() {
+            if (!this.logElement) return;
+            
+            this.logElement.innerHTML = '';
+            
+            this.logs.forEach(log => {
+                const logEntry = document.createElement('div');
+                logEntry.className = `log-entry log-${log.type}`;
+                logEntry.innerHTML = `<span>[${log.time}]</span> ${log.message}`;
+                this.logElement.appendChild(logEntry);
+            });
+        },
+        
+        clear() {
+            this.logs = [];
+            if (this.logElement) {
+                this.logElement.innerHTML = '';
+            }
+        },
+        
+        show() {
+            const panel = document.getElementById('copyLogPanel');
+            if (panel) {
+                panel.style.display = 'flex';
+            }
+        },
+        
+        hide() {
+            const panel = document.getElementById('copyLogPanel');
+            if (panel) {
+                panel.style.display = 'none';
+            }
+        }
+    };
+
+    // 添加半自动复制功能
+    const SemiAutoCopy = {
+        magnets: [],
+        currentIndex: 0,
+        totalCount: 0,
+        isPaused: false,
+        isStopped: false,
+        copyInterval: null,
+        
+        async start() {
+            // 获取选中的磁力链接
+            const selectedItems = document.querySelectorAll('.magnet-checkbox:checked');
+            
+            if (selectedItems.length === 0) {
+                alert('请先选择要复制的磁力链接！');
+                return;
+            }
+            
+            this.magnets = [];
+            
+            // 收集磁力链接和对应容器
+            for (const item of selectedItems) {
+                const container = item.parentElement;
+                const magnetIcon = container.querySelector('.magnet-icon');
+                
+                if (magnetIcon && magnetIcon.dataset.magnet) {
+                    this.magnets.push({
+                        link: magnetIcon.dataset.magnet,
+                        container,
+                        retries: 0
+                    });
+                }
+            }
+            
+            if (this.magnets.length === 0) {
+                alert('未找到可复制的磁力链接，请确保已获取到链接！');
+                return;
+            }
+            
+            this.currentIndex = 0;
+            this.totalCount = this.magnets.length;
+            this.isPaused = false;
+            this.isStopped = false;
+            
+            // 显示日志面板
+            if (Config.showCopyLogs) {
+                CopyLogger.init();
+                CopyLogger.clear();
+                CopyLogger.show();
+                CopyLogger.addLog(`准备复制 ${this.totalCount} 个磁力链接，间隔: ${Config.semiAutoCopyDelay}ms`, 'info');
+            }
+            
+            // 启动复制过程
+            await this.copyNext();
+        },
+        
+        async copyNext() {
+            if (this.isPaused || this.isStopped) {
+                return;
+            }
+            
+            if (this.currentIndex >= this.totalCount) {
+                this.finishCopy();
+                return;
+            }
+            
+            const current = this.magnets[this.currentIndex];
+            const magnetLink = current.link;
+            const container = current.container;
+            const linkShort = magnetLink.substring(0, 30) + '...';
+            
+            try {
+                GM_setClipboard(magnetLink);
+                
+                // 标记为已复制
+                container.classList.add('copied');
+                
+                CopyLogger.addLog(`成功复制: ${linkShort}`, 'success');
+                
+                // 更新进度
+                this.currentIndex++;
+                CopyLogger.updateProgress(this.currentIndex, this.totalCount);
+                
+                // 如果还有下一个，安排复制
+                if (this.currentIndex < this.totalCount && !this.isStopped) {
+                    this.copyInterval = setTimeout(() => this.copyNext(), Config.semiAutoCopyDelay);
+                } else {
+                    this.finishCopy();
+                }
+            } catch (error) {
+                if (Config.copyRetryEnabled && current.retries < Config.maxCopyRetries) {
+                    current.retries++;
+                    CopyLogger.addLog(`复制失败，重试 (${current.retries}/${Config.maxCopyRetries}): ${linkShort}`, 'error');
+                    
+                    // 安排重试
+                    setTimeout(() => this.copyNext(), Config.copyRetryDelay);
+                } else {
+                    CopyLogger.addLog(`复制失败: ${linkShort}`, 'error');
+                    
+                    // 继续下一个
+                    this.currentIndex++;
+                    CopyLogger.updateProgress(this.currentIndex, this.totalCount);
+                    
+                    if (this.currentIndex < this.totalCount && !this.isStopped) {
+                        this.copyInterval = setTimeout(() => this.copyNext(), Config.semiAutoCopyDelay);
+                    } else {
+                        this.finishCopy();
+                    }
+                }
+            }
+        },
+        
+        pause() {
+            this.isPaused = true;
+            clearTimeout(this.copyInterval);
+            CopyLogger.addLog('已暂停复制过程', 'info');
+            document.getElementById('pauseCopyBtn').textContent = '继续';
+            document.getElementById('pauseCopyBtn').onclick = () => this.resume();
+        },
+        
+        resume() {
+            this.isPaused = false;
+            CopyLogger.addLog('已恢复复制过程', 'info');
+            document.getElementById('pauseCopyBtn').textContent = '暂停';
+            document.getElementById('pauseCopyBtn').onclick = () => this.pause();
+            this.copyNext();
+        },
+        
+        stop() {
+            this.isStopped = true;
+            clearTimeout(this.copyInterval);
+            CopyLogger.addLog('已停止复制过程', 'info');
+        },
+        
+        finishCopy() {
+            const successCount = document.querySelectorAll('.magnet-container.copied').length;
+            
+            CopyLogger.addLog(`复制完成，成功: ${successCount}/${this.totalCount}`, 'info');
+            
+            if (GM_getValue('notificationEnabled')) {
+                GM_notification({
+                    title: '半自动复制完成',
+                    text: `已完成 ${this.totalCount} 个磁力链接的复制，成功: ${successCount}`,
+                    timeout: 3000
+                });
+            }
+        }
+    };
+
     // 全选功能
     selectAllBtn.addEventListener('click', () => {
         const checkboxes = document.querySelectorAll('.magnet-checkbox');
         const isAllChecked = Array.from(checkboxes).every(cb => cb.checked);
         checkboxes.forEach(checkbox => {
             checkbox.checked = !isAllChecked;
+            updateContainerStyle(checkbox.parentElement);
         });
     });
 
@@ -568,7 +1048,52 @@
         const checkboxes = document.querySelectorAll('.magnet-checkbox');
         checkboxes.forEach(checkbox => {
             checkbox.checked = !checkbox.checked;
+            updateContainerStyle(checkbox.parentElement);
         });
+    });
+
+    // 半自动复制按钮事件
+    semiAutoCopyBtn.addEventListener('click', () => {
+        SemiAutoCopy.start();
+    });
+
+    // 设置面板事件
+    settingsBtn.addEventListener('click', () => {
+        document.getElementById('settingsPanel').style.display = 'block';
+    });
+
+    document.getElementById('saveSettingsBtn').addEventListener('click', () => {
+        Config.semiAutoCopyDelay = parseInt(document.getElementById('semiAutoCopyDelay').value) || 2000;
+        Config.showCopyLogs = document.getElementById('showCopyLogs').checked;
+        Config.copyRetryEnabled = document.getElementById('copyRetryEnabled').checked;
+        Config.copyRetryDelay = parseInt(document.getElementById('copyRetryDelay').value) || 1000;
+        Config.maxCopyRetries = parseInt(document.getElementById('maxCopyRetries').value) || 2;
+        
+        Config.save();
+        document.getElementById('settingsPanel').style.display = 'none';
+        
+        GM_notification({
+            title: '设置已保存',
+            text: '半自动复制设置已更新',
+            timeout: 2000
+        });
+    });
+
+    document.getElementById('cancelSettingsBtn').addEventListener('click', () => {
+        document.getElementById('settingsPanel').style.display = 'none';
+    });
+
+    // 复制日志面板事件
+    document.getElementById('closeCopyLog').addEventListener('click', () => {
+        CopyLogger.hide();
+    });
+
+    document.getElementById('pauseCopyBtn').addEventListener('click', () => {
+        SemiAutoCopy.pause();
+    });
+
+    document.getElementById('stopCopyBtn').addEventListener('click', () => {
+        SemiAutoCopy.stop();
     });
 
     // 修改批量获取磁力链接的逻辑
@@ -680,5 +1205,8 @@
             childList: true,
             subtree: true
         });
+        
+        // 初始化半自动复制相关UI
+        CopyLogger.init();
     });
 })();
