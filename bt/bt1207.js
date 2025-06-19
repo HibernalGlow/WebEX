@@ -170,6 +170,29 @@
         }, 1000);
     }
 
+    // 检查元素是否属于或在"row search-result-toolbar"内
+    function isToolbarElement(element) {
+        if (!element) return false;
+        
+        // 检查元素本身
+        if (element.classList && element.classList.contains('search-result-toolbar')) {
+            return true;
+        }
+        
+        // 检查元素的父级链
+        let parent = element.parentElement;
+        while (parent) {
+            if (parent.classList && 
+                (parent.classList.contains('search-result-toolbar') || 
+                 (parent.classList.contains('row') && parent.classList.contains('search-result-toolbar')))) {
+                return true;
+            }
+            parent = parent.parentElement;
+        }
+        
+        return false;
+    }
+
     // 关键词列表
     const INCLUDED_KEYWORDS = [
         '汉化','官方','中文', '漢化', '掃','修正', '制', '譯', 
@@ -421,9 +444,9 @@
             width: auto;
         }
         .btn-group {
-            display: flex;
-            justify-content: flex-end;
-            margin-top: 20px;
+            /* display: flex; */
+            /* justify-content: flex-end; */
+            /* margin-top: 20px; */
         }
         .btn-group button {
             padding: 8px 16px;
