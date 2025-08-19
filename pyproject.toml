@@ -1,0 +1,9 @@
+[project]
+name = "webex"
+version = "0.1.0"
+description = "WebEX tools including download monitor"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "watchdog>=3.0.0",
+]
