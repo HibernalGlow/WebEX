@@ -267,12 +267,7 @@
     async function processLink(linkData) {
         const { link, previewDiv, img, loadingText, canonicalTid, canonicalUrl } = linkData;
         try {
-            const targetUrl = canonicalUrl || link.href;
-            if (!targetUrl) {
-                log('跳过：无有效 URL');
-                return cleanupOnFailure(link, previewDiv, loadingText, '无URL');
-            }
-            const postDoc = await fetchPostAsDom(targetUrl);
+            const postDoc = await fetchPostAsDom(canonicalUrl);
             if (!postDoc) { return cleanupOnFailure(link, previewDiv, loadingText, '获取失败'); }
 
             // 备用图床
@@ -414,7 +409,7 @@
             previewDiv.dataset.forLink = link.href;
             insertPreview(link, previewDiv);
             if (canonicalTid) tidQueued.add(canonicalTid);
-            return { link, previewDiv, img, loadingText, canonicalTid, canonicalUrl };
+            return { link, previewDiv, img, loadingText };
         }).filter(Boolean);
     }
 
