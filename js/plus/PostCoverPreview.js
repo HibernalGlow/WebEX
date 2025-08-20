@@ -30,6 +30,10 @@
         INCLUDE_NORMAL: 'PostCoverPreviewIncludeNormalLinks'
     };
 
+    // 记录已进入队列 / 已成功处理的帖子 tid，避免同一 tid 的不同链接形式(如含 -uid- 版本)重复加载
+    const tidQueued = new Set();
+    const tidDone = new Set();
+
     /******************** 配置访问 ********************/
     const Config = {
         get enabled() { return GM_getValue(CONFIG_KEYS.ENABLED, true); },
@@ -52,6 +56,20 @@
         // 支持格式: read.php?tid=12345, read.php?tid-12345.html, read.php?tid-12345-fpage-2.html
         const m = url.match(/read\.php.*?[?&]tid=(\d+)/) || url.match(/read\.php.*?tid-(\d+)/);
         return m ? m[1] : null;
+    }
+
+    // 生成帖子的规范化链接(尽量使用不带 -uid- 的版本，去除多余 segment) 仅用于去重与抓取
+    function canonicalizePostUrl(href) {
+        let url = href;
+        // path 形式 tid-2632369-uid-475242.html -> tid-2632369.html
+        url = url.replace(/(tid-\d+)-uid-\d+/i, '$1');
+        // 可能存在 &uid=xxx 形式 (防御性)
+        if (/tid=\d+/i.test(url)) {
+            url = url.replace(/([?&])uid=\d+(&|$)/i, (match, p1, p2) => p2 ? p1 : '');
+            // 清理可能出现的多余 ?&
+            url = url.replace(/\?&/, '?').replace(/&&+/, '&').replace(/[?&]$/,'');
+        }
+        return url;
     }
 
     function getPageContext() {
@@ -247,9 +265,14 @@
     }
 
     async function processLink(linkData) {
-        const { link, previewDiv, img, loadingText } = linkData;
+        const { link, previewDiv, img, loadingText, canonicalTid, canonicalUrl } = linkData;
         try {
-            const postDoc = await fetchPostAsDom(link.href);
+            const targetUrl = canonicalUrl || link.href;
+            if (!targetUrl) {
+                log('跳过：无有效 URL');
+                return cleanupOnFailure(link, previewDiv, loadingText, '无URL');
+            }
+            const postDoc = await fetchPostAsDom(targetUrl);
             if (!postDoc) { return cleanupOnFailure(link, previewDiv, loadingText, '获取失败'); }
 
             // 备用图床
@@ -274,6 +297,9 @@
             loadingText.textContent = '加载完成';
             loadingText.style.color = 'green';
             link.dataset.pcpProcessed = '1';
+            if (canonicalTid) {
+                tidDone.add(canonicalTid);
+            }
         } catch (e) {
             log('处理失败: ' + e.message);
             cleanupOnFailure(link, previewDiv, loadingText, '异常');
@@ -370,14 +396,25 @@
         return links.map(link => {
             if (link.dataset.pcpProcessed === '1') return null; // 已成功处理
             if (link.dataset.pcpProcessing === '1') return null; // 处理中
+            if (link.dataset.pcpQueued === '1') return null; // 已进入队列（避免与全局扫描重复）
             const attempts = parseInt(link.dataset.pcpAttempts || '0', 10);
             if (attempts >= 2) return null; // 达到最大尝试次数
+
+            const canonicalTid = getTidFromUrl(link.href);
+            const canonicalUrl = canonicalizePostUrl(link.href);
+            // 如果 tid 已完成或已在队列中，跳过（多个重复链接只生成一个预览）
+            if (canonicalTid && (tidQueued.has(canonicalTid) || tidDone.has(canonicalTid))) {
+                link.dataset.pcpTidSkipped = '1';
+                return null;
+            }
             link.dataset.pcpAttempts = String(attempts + 1);
             link.dataset.pcpProcessing = '1';
+            link.dataset.pcpQueued = '1';
             const { previewDiv, img, loadingText } = createPreviewContainer();
             previewDiv.dataset.forLink = link.href;
             insertPreview(link, previewDiv);
-            return { link, previewDiv, img, loadingText };
+            if (canonicalTid) tidQueued.add(canonicalTid);
+            return { link, previewDiv, img, loadingText, canonicalTid, canonicalUrl };
         }).filter(Boolean);
     }
 
@@ -401,10 +438,10 @@
         }
 
         // 全局普通链接补充扫描：1) 没有表格 或 2) 用户勾选普通链接
-        if ((Config.includeNormal && !tables.length) || (Config.includeNormal && tables.length)) {
+        if (Config.includeNormal) {
             const globalLinks = collectGlobalLinks(context);
             // 去除已经在表格里处理的
-            const pending = globalLinks.filter(a => a.dataset.pcpProcessed !== '1');
+            const pending = globalLinks.filter(a => a.dataset.pcpProcessed !== '1' && a.dataset.pcpQueued !== '1');
             log(`全局普通链接补充数量: ${pending.length}`);
             const linksData = buildLinksData(pending);
             totalLinksProcessed += linksData.length;
