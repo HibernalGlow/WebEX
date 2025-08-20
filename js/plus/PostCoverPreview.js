@@ -48,11 +48,18 @@
     }
 
     /******************** 页面上下文判定 ********************/
+    function getTidFromUrl(url) {
+        // 支持格式: read.php?tid=12345, read.php?tid-12345.html, read.php?tid-12345-fpage-2.html
+        const m = url.match(/read\.php.*?[?&]tid=(\d+)/) || url.match(/read\.php.*?tid-(\d+)/);
+        return m ? m[1] : null;
+    }
+
     function getPageContext() {
         const url = window.location.href;
         return {
             isUserTopicPage: url.includes('u.php?'),
-            url
+            url,
+            currentTid: getTidFromUrl(url)
         };
     }
 
@@ -243,7 +250,7 @@
         const { link, previewDiv, img, loadingText } = linkData;
         try {
             const postDoc = await fetchPostAsDom(link.href);
-            if (!postDoc) return previewDiv.remove();
+            if (!postDoc) { return cleanupOnFailure(link, previewDiv, loadingText, '获取失败'); }
 
             // 备用图床
             const backupImages = postDoc.evaluate(
@@ -258,18 +265,32 @@
                 const firstImg = postDoc.querySelector('div#read_tpc img:not([src*="face"]):not([src*="logo"])');
                 if (firstImg) { imgSrc = firstImg.src; log('使用普通图片: ' + imgSrc); }
             }
-            if (!imgSrc) return previewDiv.remove();
+            if (!imgSrc) { return cleanupOnFailure(link, previewDiv, loadingText, '无图片'); }
 
             const valid = await checkImageValid(imgSrc);
-            if (!valid) return previewDiv.remove();
+            if (!valid) { return cleanupOnFailure(link, previewDiv, loadingText, '图片失效'); }
 
             img.src = imgSrc;
             loadingText.textContent = '加载完成';
             loadingText.style.color = 'green';
+            link.dataset.pcpProcessed = '1';
         } catch (e) {
             log('处理失败: ' + e.message);
-            previewDiv.remove();
+            cleanupOnFailure(link, previewDiv, loadingText, '异常');
+        } finally {
+            delete link.dataset.pcpProcessing;
         }
+    }
+
+    function cleanupOnFailure(link, previewDiv, loadingText, reason) {
+        if (loadingText) {
+            loadingText.textContent = reason;
+            loadingText.style.color = reason === '无图片' ? '#b36b00' : 'red';
+        }
+        // 延迟移除以便用户瞬间看到状态
+        setTimeout(() => { if (previewDiv.isConnected) previewDiv.remove(); }, 800);
+        delete link.dataset.pcpProcessing;
+        log('链接预览失败: ' + reason + ' -> ' + link.href);
     }
 
     function collectTargetTables(context) {
@@ -311,6 +332,13 @@
     }
 
     function shouldSkipLink(link, context) {
+        // 跳过当前页面自身帖子链接
+        if (context.currentTid) {
+            const linkTid = getTidFromUrl(link.href);
+            if (linkTid && linkTid === context.currentTid) {
+                return true;
+            }
+        }
         if (!context.isUserTopicPage) return false;
         const parentText = link.parentElement?.textContent || '';
         if (parentText.includes('xxx xxx') || parentText.includes('----') || /xxx\s+xxx/i.test(parentText)) {
@@ -340,11 +368,15 @@
 
     function buildLinksData(links) {
         return links.map(link => {
-            if (link.dataset.pcpProcessed === '1') return null; // 已标记
-            if (link.parentElement?.querySelector('.post-cover-preview')) return null; // 已有预览
+            if (link.dataset.pcpProcessed === '1') return null; // 已成功处理
+            if (link.dataset.pcpProcessing === '1') return null; // 处理中
+            const attempts = parseInt(link.dataset.pcpAttempts || '0', 10);
+            if (attempts >= 2) return null; // 达到最大尝试次数
+            link.dataset.pcpAttempts = String(attempts + 1);
+            link.dataset.pcpProcessing = '1';
             const { previewDiv, img, loadingText } = createPreviewContainer();
+            previewDiv.dataset.forLink = link.href;
             insertPreview(link, previewDiv);
-            link.dataset.pcpProcessed = '1';
             return { link, previewDiv, img, loadingText };
         }).filter(Boolean);
     }
