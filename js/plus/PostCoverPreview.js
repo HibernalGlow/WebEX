@@ -267,8 +267,9 @@
     async function processLink(linkData) {
         const { link, previewDiv, img, loadingText, canonicalTid, canonicalUrl } = linkData;
         try {
-            const postDoc = await fetchPostAsDom(canonicalUrl);
-            if (!postDoc) { return cleanupOnFailure(link, previewDiv, loadingText, '获取失败'); }
+            const targetUrl = canonicalUrl || link.href;
+            const postDoc = await fetchPostAsDom(targetUrl);
+            if (!postDoc) { return cleanupOnFailure(linkData, '获取失败'); }
 
             // 备用图床
             const backupImages = postDoc.evaluate(
@@ -283,10 +284,10 @@
                 const firstImg = postDoc.querySelector('div#read_tpc img:not([src*="face"]):not([src*="logo"])');
                 if (firstImg) { imgSrc = firstImg.src; log('使用普通图片: ' + imgSrc); }
             }
-            if (!imgSrc) { return cleanupOnFailure(link, previewDiv, loadingText, '无图片'); }
+            if (!imgSrc) { return cleanupOnFailure(linkData, '无图片'); }
 
             const valid = await checkImageValid(imgSrc);
-            if (!valid) { return cleanupOnFailure(link, previewDiv, loadingText, '图片失效'); }
+            if (!valid) { return cleanupOnFailure(linkData, '图片失效'); }
 
             img.src = imgSrc;
             loadingText.textContent = '加载完成';
@@ -295,21 +296,66 @@
             if (canonicalTid) {
                 tidDone.add(canonicalTid);
             }
+            // 成功后如有重试按钮，移除之
+            const actions = previewDiv.querySelector('.pcp-actions');
+            if (actions) actions.remove();
         } catch (e) {
             log('处理失败: ' + e.message);
-            cleanupOnFailure(link, previewDiv, loadingText, '异常');
+            cleanupOnFailure(linkData, '异常');
         } finally {
             delete link.dataset.pcpProcessing;
         }
     }
 
-    function cleanupOnFailure(link, previewDiv, loadingText, reason) {
+    function addRetryActions(previewDiv, linkData) {
+        let actions = previewDiv.querySelector('.pcp-actions');
+        if (!actions) {
+            actions = document.createElement('div');
+            actions.className = 'pcp-actions';
+            actions.style.cssText = 'margin-top:6px; display:flex; gap:6px; align-items:center;';
+            previewDiv.appendChild(actions);
+        } else {
+            actions.innerHTML = '';
+        }
+        const retryBtn = document.createElement('button');
+        retryBtn.textContent = '重试';
+        retryBtn.style.cssText = 'padding:2px 6px; font-size:12px;';
+        retryBtn.addEventListener('click', async () => {
+            const { link, loadingText } = linkData;
+            loadingText.textContent = '重试中...';
+            loadingText.style.color = '#666';
+            retryBtn.disabled = true;
+            // 允许手动重试，不受 attempts 限制
+            link.dataset.pcpProcessing = '1';
+            try {
+                await processLink(linkData);
+            } finally {
+                retryBtn.disabled = false;
+            }
+        });
+        const openLink = document.createElement('a');
+        openLink.textContent = '打开帖子';
+        openLink.href = linkData.link.href;
+        openLink.target = '_blank';
+        openLink.rel = 'noopener noreferrer';
+        openLink.style.cssText = 'font-size:12px; color:#06c; text-decoration:underline;';
+        actions.appendChild(retryBtn);
+        actions.appendChild(openLink);
+    }
+
+    function cleanupOnFailure(linkData, reason) {
+        const { link, previewDiv, loadingText } = linkData;
         if (loadingText) {
-            loadingText.textContent = reason;
+            loadingText.textContent = reason === '无图片' ? '未检测到图片，可能为懒加载。可稍后重试。' : reason;
             loadingText.style.color = reason === '无图片' ? '#b36b00' : 'red';
         }
-        // 延迟移除以便用户瞬间看到状态
-        setTimeout(() => { if (previewDiv.isConnected) previewDiv.remove(); }, 800);
+        if (reason === '无图片') {
+            // 保留预览容器，提供重试与打开链接
+            addRetryActions(previewDiv, linkData);
+        } else {
+            // 其他失败类型仍按原逻辑移除
+            setTimeout(() => { if (previewDiv.isConnected) previewDiv.remove(); }, 800);
+        }
         delete link.dataset.pcpProcessing;
         log('链接预览失败: ' + reason + ' -> ' + link.href);
     }
@@ -409,7 +455,7 @@
             previewDiv.dataset.forLink = link.href;
             insertPreview(link, previewDiv);
             if (canonicalTid) tidQueued.add(canonicalTid);
-            return { link, previewDiv, img, loadingText };
+            return { link, previewDiv, img, loadingText, canonicalTid, canonicalUrl };
         }).filter(Boolean);
     }
 
