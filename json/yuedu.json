@@ -1,3 +1,4 @@
+[
 {
     "bookSourceComment": "可乐小说专用书源\n适配 https://www.klxs.tw\n支持目录与正文WebView回退\n仅用于单本书阅读",
     "bookSourceGroup": "★专用书源",
@@ -47,3 +48,4 @@
     "searchUrl": "\/search.php?keyword={{key}}",
     "weight": 0
 }
+]
