@@ -25,8 +25,8 @@
         "wordCount": ""
     },
     "ruleContent": {
-        "content": "@css:#content@textNodes||@css:#booktext@textNodes||@css:#BookText@textNodes",
-        "nextContentUrl": "@css:a:matchesOwn(下一章|下一[页頁])@href",
+        "content": "#content@textNodes||#booktext@textNodes||#BookText@textNodes,{\"webView\":true}",
+        "nextContentUrl": "a:matchesOwn(下一章|下一[页頁])@href,{\"webView\":true}",
         "replaceRegex": "##本站.*All Rights Reserved\\\\.|^\\\\n?\\\\s*亲,双击屏幕即可自动滚动.*$"
     },
     "ruleExplore": {},
@@ -40,10 +40,10 @@
         "name": "@css:text"
     },
     "ruleToc": {
-        "chapterList": "@css:a[href~=^\/\\\\d+\/\\\\d+\\\\.html$]",
-        "chapterName": "@css:text",
-        "chapterUrl": "@css:href",
-        "nextTocUrl": "@css:a:matchesOwn(下一[页頁])@href"
+        "chapterList": "a[href~=\/\\d+\/\\d+\\.html$],{\"webView\":true}",
+        "chapterName": "text",
+        "chapterUrl": "href",
+        "nextTocUrl": "a:matchesOwn(下一[页頁])@href,{\"webView\":true}"
     },
     "searchUrl": "\/search.php?keyword={{key}}",
     "weight": 0
