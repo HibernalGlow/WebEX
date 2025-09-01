@@ -8,14 +8,14 @@
     "customOrder": 0,
     "enabled": true,
     "enabledCookieJar": false,
-    "enabledExplore": true,
-    "header": "{\n\t\"User-Agent\":\"Mozilla\/5.0 (Linux; Android 13; V2148A Build\/TP1A.220624.014; wv) AppleWebKit\/537.36 (KHTML, like Gecko) Version\/4.0 Chrome\/128.0.6613.146 Mobile Safari\/537.36\",\n\t\"Referer\":\"https:\/\/www.d3xsw.com\/\"\n\t}",
+    "enabledExplore": false,
+    "header": "{\n\t\"User-Agent\":\"Mozilla\/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit\/537.36 (KHTML, like Gecko) Chrome\/122.0.0.0 Safari\/537.36\",\n\t\"Referer\":\"https:\/\/www.klxs.tw\/\"\n\t}",
     "lastUpdateTime": "1753622519871",
     "respondTime": 180000,
     "ruleBookInfo": {
         "author": "@get:{a}##作者：",
         "coverUrl": "@get:{i}",
-        "init": "@put:{n:\"h1@text\",\na:\":matchesOwn(^\\\\s*作者[：:])@text##^\\\\s*作者[：:]\\\\s*\",\nc:\":matchesOwn(類別|类别)@text##類別：|类别：|狀態：|状态：|最後更新：|最后更新：\",\nl:\"a:matchesOwn(第.+章)@text\",\nd:\":matchesOwn(簡介|简介)@textNodes\",\ni:\"img[src~=\\/\\\\d+\\/\\\\d+s?\\\\.jpg$]@src||meta[property$=image]@content\"}",
+        "init": "@put:{n:\"@css:h1@text\",\na:\"@css::matchesOwn(^作者[：:])@text##^作者[：:]\\\\s*\",\nc:\"@css::matchesOwn(類別|类别|狀態|状态)@text##類別：|类别：|狀態：|状态：\",\nl:\"@css:a:matchesOwn(第.+章)@text\",\nd:\"@css::matchesOwn(簡介|简介)@textNodes\",\ni:\"@css:img[src~=\\/\\\\d+\\/\\\\d+s?\\\\.jpg$]@src||@css:meta[property$=image]@content\"}",
         "intro": "@get:{d}##簡介：|简介：",
         "kind": "@get:{c}##類別：|类别：|狀態：|状态：|最後更新：|最后更新：",
         "lastChapter": "@get:{l}",
@@ -24,25 +24,25 @@
         "wordCount": ""
     },
     "ruleContent": {
-        "content": "@js:(function(){var d=org.jsoup.Jsoup.parse(result);var c=d.select('#content, #booktext, #BookText');if(c.size())return c.html();var d2=org.jsoup.Jsoup.parse(java.ajax(baseUrl+',{\\\"webView\\\":true}'));return d2.select('#content, #booktext, #BookText').html()})()",
-        "nextContentUrl": "@js:(function(){var d=org.jsoup.Jsoup.parse(result);var a=d.select('a:matchesOwn(下一章|下一[页頁])');if(a.size())return a.first().attr('href');var d2=org.jsoup.Jsoup.parse(java.ajax(baseUrl+',{\\\"webView\\\":true}'));a=d2.select('a:matchesOwn(下一章|下一[页頁])');return a.size()?a.first().attr('href'):''})()",
+        "content": "@css:#content@textNodes||@css:#booktext@textNodes||@css:#BookText@textNodes",
+        "nextContentUrl": "@css:a:matchesOwn(下一章|下一[页頁])@href",
         "replaceRegex": "##本站.*All Rights Reserved\\\\.|^\\\\n?\\\\s*亲,双击屏幕即可自动滚动.*$"
     },
     "ruleExplore": {},
     "ruleSearch": {
         "author": "",
-        "bookList": "a[href~=^\/\\\\d+\/?$]",
-        "bookUrl": "href",
+        "bookList": "@css:a[href~=^\/\\\\d+\/?$]",
+        "bookUrl": "@css:href",
         "intro": "",
         "kind": "",
         "lastChapter": "",
-        "name": "text"
+        "name": "@css:text"
     },
     "ruleToc": {
-        "chapterList": "@js:(function(){var d=org.jsoup.Jsoup.parse(result);var s=d.select('a[href~=^\/\\\\d+\/\\\\d+\\\\.html$]');if(s.size())return s;var d2=org.jsoup.Jsoup.parse(java.ajax(baseUrl+',{\\\"webView\\\":true}'));return d2.select('a[href~=^\/\\\\d+\/\\\\d+\\\\.html$]')})()",
-        "chapterName": "text",
-        "chapterUrl": "href",
-        "nextTocUrl": "@js:(function(){var d=org.jsoup.Jsoup.parse(result);var a=d.select('a:matchesOwn(下一[页頁])');if(a.size())return a.first().attr('href');var d2=org.jsoup.Jsoup.parse(java.ajax(baseUrl+',{\\\"webView\\\":true}'));a=d2.select('a:matchesOwn(下一[页頁])');return a.size()?a.first().attr('href'):''})()"
+        "chapterList": "@css:a[href~=^\/\\\\d+\/\\\\d+\\\\.html$]",
+        "chapterName": "@css:text",
+        "chapterUrl": "@css:href",
+        "nextTocUrl": "@css:a:matchesOwn(下一[页頁])@href"
     },
     "searchUrl": "\/search.php?keyword={{key}}",
     "weight": 0
