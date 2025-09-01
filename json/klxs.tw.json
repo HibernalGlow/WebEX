@@ -1,0 +1,57 @@
+[
+  {
+    "bookSourceName": "可乐小说(klxs.tw)",
+    "bookSourceGroup": "专用",
+    "bookSourceUrl": "https://www.klxs.tw",
+    "bookSourceType": 0,
+      "bookUrlPattern": "^https?:\\/\\/(?:www\\.)?klxs\\.tw\\/\\d+\\/\\/?$",
+    "enabled": true,
+    "enabledExplore": false,
+    "header": "{'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'}",
+    "respondTime": 180000,
+    "loginUrl": "",
+    "exploreUrl": "",
+    "searchUrl": "https://www.klxs.tw/search.php?keyword={{key}}",
+
+    "ruleSearch": {
+        "bookList": "a[href~=^/\\d+/?$]",
+      "bookUrl": "href",
+      "name": "text",
+      "author": "",
+      "coverUrl": "",
+      "intro": "",
+      "kind": "",
+      "lastChapter": "",
+      "wordCount": ""
+    },
+
+    "ruleBookInfo": {
+      "name": "h1@text",
+        "author": "@js:var r=org.jsoup.Jsoup.parse(result);var e=r.select(':matchesOwn(^\\s*作者[：:])');if(e.size()){var t=e.first().text().replace(/^\\s*作者[：:]\\s*/, '');t}else{var m=String(r.text()).match(/作者[：:]\\s*([\\u4e00-\\u9fa5A-Za-z0-9_·]+)/);m?m[1]:''}",
+      "intro": "id.intro@text",
+      "coverUrl": "meta[property$=image]@content||img[src~=\\/\\d+\\/\\d+s?\\.jpg$]@src",
+      "lastChapter": "a:matchesOwn(^最新章节$)@text||class.renew@a@text",
+      "canReName": "true",
+      "tocUrl": "",
+      "wordCount": ""
+    },
+
+    "ruleToc": {
+      "chapterList": "a[href~=^/\\d+/\\d+\\.html$]",
+      "chapterName": "text",
+      "chapterUrl": "href",
+      "nextTocUrl": "a:matchesOwn(下一[页頁])@href",
+      "isVip": "",
+      "updateTime": ""
+    },
+
+    "ruleContent": {
+        "content": "id.content@textNodes||#content@textNodes||id.booktext@textNodes||id.BookText@textNodes",
+      "nextContentUrl": "a:matchesOwn(下一章|下一[页頁])@href",
+      "imageStyle": "FULL",
+        "replaceRegex": "##本站.*All Rights Reserved\\.|^\\n?\\s*亲,双击屏幕即可自动滚动.*$"
+    },
+
+    "weight": 0
+  }
+]
